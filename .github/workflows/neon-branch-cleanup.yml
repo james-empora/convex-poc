@@ -1,0 +1,62 @@
+name: Neon Branch Cleanup
+
+on:
+  pull_request_target:
+    types:
+      - closed
+
+permissions:
+  contents: read
+
+env:
+  NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+  NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+
+jobs:
+  cleanup-neon-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Neon configuration
+        run: |
+          test -n "$NEON_API_KEY"
+          test -n "$NEON_PROJECT_ID"
+
+      - name: Delete Neon branches for this PR's git branch
+        run: |
+          git_branch="${{ github.event.pull_request.head.ref }}"
+          echo "Looking for Neon branches associated with git branch: $git_branch"
+
+          # List all branches in the Neon project
+          branches=$(curl -sS \
+            "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches" \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            -H "Content-Type: application/json")
+
+          # Find branches created by the Vercel integration for this git branch.
+          # The Neon-Vercel integration names branches after the git branch.
+          # Match on the branch name containing the git branch name, excluding
+          # the default/main branch.
+          branch_ids=$(echo "$branches" | jq -r --arg git_branch "$git_branch" \
+            '.branches[] | select(.name | test($git_branch)) | select(.default != true) | .id')
+
+          if [ -z "$branch_ids" ]; then
+            echo "No Neon branches found matching: $git_branch"
+            exit 0
+          fi
+
+          for branch_id in $branch_ids; do
+            branch_name=$(echo "$branches" | jq -r --arg id "$branch_id" \
+              '.branches[] | select(.id == $id) | .name')
+            echo "Deleting Neon branch: $branch_name ($branch_id)"
+
+            http_status=$(curl -sS -o /dev/null -w "%{http_code}" \
+              -X DELETE "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches/$branch_id" \
+              -H "Authorization: Bearer $NEON_API_KEY" \
+              -H "Content-Type: application/json")
+
+            if [ "$http_status" = "200" ] || [ "$http_status" = "204" ] || [ "$http_status" = "404" ]; then
+              echo "  Deleted successfully (HTTP $http_status)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "  Warning: unexpected status $http_status (continuing)"
+            fi
+          done

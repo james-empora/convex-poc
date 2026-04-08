@@ -1,0 +1,63 @@
+on:
+  cli:
+    init:
+      commit-sha: ${{ event.git.sha }}
+  github:
+    pull_request:
+      init:
+        commit-sha: ${{ event.git.sha }}
+        pr-number: ${{ event.github.pull_request.number }}
+
+concurrency-pools:
+  - id: emporatitle/empora:pr-${{ init.pr-number }}
+    capacity: 1
+    on-overflow: cancel-running
+
+base:
+  image: ubuntu:24.04
+  config: rwx/base 1.0.0
+
+tool-cache:
+  vault: empora_ci
+
+tasks:
+  - key: code
+    call: git/clone 2.0.7
+    with:
+      repository: https://github.com/emporatitle/empora.git
+      ref: ${{ init.commit-sha }}
+      github-token: ${{ github.token }}
+
+  - key: node
+    call: nodejs/install 1.1.13
+    with:
+      node-version: "24.2.0"
+
+  - key: install
+    use: [code, node]
+    run: |
+      corepack enable
+      pnpm install --frozen-lockfile
+    filter:
+      - package.json
+      - pnpm-lock.yaml
+    tool-cache: pnpm-install
+
+  - key: lint
+    use: install
+    run: pnpm lint
+
+  - key: typecheck
+    use: install
+    run: pnpm tsc --noEmit
+
+  - key: test
+    use: install
+    docker: true
+    background-processes:
+      - key: postgres
+        run: docker run --name postgres -p 5432:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=postgres postgis/postgis:16-3.5
+        ready-check: docker exec postgres pg_isready -U postgres
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    run: pnpm vitest run
