@@ -311,6 +311,14 @@ interface ChargeRow {
   amount: string;
 }
 
+interface ChargeAllocationInput {
+  partyId: string;
+  partyName: string;
+  partySide: LineItemCharge["partySide"];
+  debitCents: number;
+  creditCents: number;
+}
+
 function InlineAddLineItem({
   ledgerId,
   parties,
@@ -366,13 +374,12 @@ function InlineAddLineItem({
     setError(null);
     try {
       // Build charge allocations: debit payers, credit payee
-      const chargeAllocations: LineItemCharge[] = validCharges.map((c, index) => {
+      const chargeAllocations: ChargeAllocationInput[] = validCharges.map((c) => {
         const party = parties.find((p) => p.id === c.partyId)!;
         const debitAmount = validCharges.length > 1 && c.amount
           ? Math.round(parseFloat(c.amount) * 100)
           : totalCents;
         return {
-          id: `${c.partyId}-${index}`,
           partyId: c.partyId,
           partyName: party.name,
           partySide: party.side,
@@ -383,7 +390,6 @@ function InlineAddLineItem({
       // Add the credit side (payee)
       if (payee) {
         chargeAllocations.push({
-          id: `payee-${payeeId}`,
           partyId: payeeId,
           partyName: payee.name,
           partySide: payee.side,

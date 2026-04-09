@@ -301,19 +301,38 @@ export const createLedger = mutation({
 });
 
 export const getLedger = query({
-  args: { fileId: v.string() },
+  args: {
+    fileId: v.optional(v.string()),
+    ledgerId: v.optional(v.string()),
+  },
   returns: v.any(),
   handler: async (ctx, args) => {
-    const file = await findFileByLegacyId(ctx, args.fileId);
-    if (!file) {
-      throw new ConvexError({ code: "NotFound", message: `File not found: ${args.fileId}` });
+    let file: Doc<"files"> | null = null;
+    let ledger: Doc<"ledgers"> | null = null;
+
+    if (args.ledgerId) {
+      ledger = await findLedgerByLegacyId(ctx, args.ledgerId);
+      if (!ledger) {
+        throw new ConvexError({ code: "NotFound", message: `Ledger not found: ${args.ledgerId}` });
+      }
+      file = await ctx.db.get(ledger.fileId);
+    } else if (args.fileId) {
+      file = await findFileByLegacyId(ctx, args.fileId);
+      if (file) {
+        const fileDocId = file._id;
+        const ledgers = await ctx.db
+          .query("ledgers")
+          .withIndex("by_file_id", (q) => q.eq("fileId", fileDocId))
+          .collect();
+        ledger = ledgers.find((candidate) => candidate.isPrimary) ?? null;
+      }
+    } else {
+      throw new ConvexError({ code: "ValidationError", message: "fileId or ledgerId is required" });
     }
 
-    const ledgers = await ctx.db
-      .query("ledgers")
-      .withIndex("by_file_id", (q) => q.eq("fileId", file._id))
-      .collect();
-    const ledger = ledgers.find((candidate) => candidate.isPrimary);
+    if (!file) {
+      throw new ConvexError({ code: "NotFound", message: `File not found: ${args.fileId ?? args.ledgerId}` });
+    }
     if (!ledger) {
       return null;
     }
@@ -755,7 +774,7 @@ export const checkFundingReadiness = query({
       throw new ConvexError({ code: "NotFound", message: `Ledger not found: ${args.ledgerId}` });
     }
     const summary = await computeLedgerSummary(ctx, file, ledger);
-    const parties = summary.partyBalances.map((party: any) => ({
+    const parties = summary.partyBalances.map((party) => ({
       partyId: party.partyId,
       partyName: party.partyName,
       partySide: party.partySide,
@@ -765,8 +784,8 @@ export const checkFundingReadiness = query({
       fundingGapCents: party.isFunded ? 0 : Math.max(0, party.balanceCents - party.totalReceiptsCents),
       isFunded: party.isFunded,
     }));
-    const allFunded = parties.every((p: any) => p.isFunded);
-    const totalGap = sum(parties.map((p: any) => p.fundingGapCents));
+    const allFunded = parties.every((party) => party.isFunded);
+    const totalGap = sum(parties.map((party) => party.fundingGapCents));
     return {
       ledgerId: args.ledgerId,
       allPartiesFunded: allFunded,
@@ -774,7 +793,7 @@ export const checkFundingReadiness = query({
       parties,
       message: allFunded
         ? "All parties are fully funded."
-        : `${parties.filter((p: any) => !p.isFunded).length} party/parties have funding gaps totaling $${(totalGap / 100).toFixed(2)}.`,
+        : `${parties.filter((party) => !party.isFunded).length} party/parties have funding gaps totaling $${(totalGap / 100).toFixed(2)}.`,
     };
   },
 });
@@ -812,22 +831,41 @@ export const checkDrift = query({
 });
 
 export const checkMissingItems = query({
-  args: { fileId: v.string() },
+  args: {
+    fileId: v.optional(v.string()),
+    ledgerId: v.optional(v.string()),
+  },
   returns: v.any(),
   handler: async (ctx, args) => {
-    const file = await findFileByLegacyId(ctx, args.fileId);
+    let file: Doc<"files"> | null = null;
+    let ledger: Doc<"ledgers"> | null = null;
+
+    if (args.ledgerId) {
+      ledger = await findLedgerByLegacyId(ctx, args.ledgerId);
+      if (!ledger) {
+        throw new ConvexError({ code: "NotFound", message: `Ledger not found: ${args.ledgerId}` });
+      }
+      file = await ctx.db.get(ledger.fileId);
+    } else if (args.fileId) {
+      file = await findFileByLegacyId(ctx, args.fileId);
+    } else {
+      throw new ConvexError({ code: "ValidationError", message: "fileId or ledgerId is required" });
+    }
+
     if (!file) {
-      throw new ConvexError({ code: "NotFound", message: `File not found: ${args.fileId}` });
+      throw new ConvexError({ code: "NotFound", message: `File not found: ${args.fileId ?? args.ledgerId}` });
     }
     const property = await ctx.db.get(file.propertyId);
     const address = property ? await ctx.db.get(property.addressId) : null;
-    const ledgers = await ctx.db
-      .query("ledgers")
-      .withIndex("by_file_id", (q) => q.eq("fileId", file._id))
-      .collect();
-    const ledger = ledgers.find((candidate) => candidate.isPrimary);
     if (!ledger) {
-      return { fileId: args.fileId, missingCount: 0, missing: [], message: "No ledger exists yet." };
+      const ledgers = await ctx.db
+        .query("ledgers")
+        .withIndex("by_file_id", (q) => q.eq("fileId", file._id))
+        .collect();
+      ledger = ledgers.find((candidate) => candidate.isPrimary) ?? null;
+    }
+    if (!ledger) {
+      return { fileId: legacy(file), missingCount: 0, missing: [], message: "No ledger exists yet." };
     }
     const items = (await ctx.db
       .query("line_items")
@@ -845,7 +883,7 @@ export const checkMissingItems = query({
         computeMethod: template.computeMethod,
       }));
     return {
-      fileId: args.fileId,
+      fileId: legacy(file),
       ledgerId: legacy(ledger),
       missingCount: missing.length,
       missing,

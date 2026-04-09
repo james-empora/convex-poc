@@ -1,4 +1,5 @@
 import { defineTool } from "@/lib/tools/define-tool";
+import { AddLineItemInput } from "@/lib/finances/tool-inputs.input";
 
 export const addLineItemTool = defineTool({
   actionName: "addLineItem",
@@ -7,6 +8,7 @@ export const addLineItemTool = defineTool({
   gatewayDescription:
     "Add a new line item to the settlement statement (charge, credit, or fee). " +
     "Specify the label, section, amount in cents, and which parties are debited/credited.",
+  inputSchema: AddLineItemInput,
   ui: {
     label: "Add Line Item",
     loadingLabel: "Adding line item...",

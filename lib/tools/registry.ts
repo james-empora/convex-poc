@@ -27,7 +27,6 @@ type ToolEntry = {
 
 const uuid = z.string().uuid();
 const passthrough = () => z.object({}).passthrough();
-const optionalUuid = uuid.optional();
 
 const TOOL_DEFINITION_BY_NAME = new Map(
   listToolDefinitions().map((definition) => [definition.toolName, definition]),
@@ -72,9 +71,9 @@ const TOOL_ENTRIES: ToolEntry[] = [
     client.query(api.files.getFile, input as never)),
   createConvexToolEntry(getDefinition("addFileParty"), toolInput(getDefinition("addFileParty")), (client, input) =>
     client.mutation(api.files.addFileParty, input as never)),
-  createConvexToolEntry(getDefinition("removeFileParty"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("removeFileParty"), toolInput(getDefinition("removeFileParty")), (client, input) =>
     client.mutation(api.files.removeFileParty, input as never)),
-  createConvexToolEntry(getDefinition("readEntities"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("readEntities"), toolInput(getDefinition("readEntities")), (client, input) =>
     client.query(api.entities.readEntities, input as never)),
   createConvexToolEntry(getDefinition("searchEntities"), toolInput(getDefinition("searchEntities")), (client, input) =>
     client.query(api.entities.searchEntities, input as never)),
@@ -82,35 +81,35 @@ const TOOL_ENTRIES: ToolEntry[] = [
     client.mutation(api.entities.createEntity, input as never)),
   createConvexToolEntry(getDefinition("generateStatement"), z.object({ fileId: uuid }), (client, input) =>
     client.mutation(api.finances.generateStatement, input as never)),
-  createConvexToolEntry(getDefinition("getLedgerSummary"), z.object({ ledgerId: optionalUuid, fileId: optionalUuid }).refine((value) => !!value.ledgerId || !!value.fileId), (client, input) =>
+  createConvexToolEntry(getDefinition("getLedgerSummary"), toolInput(getDefinition("getLedgerSummary")), (client, input) =>
     client.query(api.finances.getLedger, input as never)),
   createConvexToolEntry(getDefinition("getLineItems"), z.object({ ledgerId: uuid }), (client, input) =>
     client.query(api.finances.getLineItems, input as never)),
   createConvexToolEntry(getDefinition("getPayments"), z.object({ ledgerId: uuid }), (client, input) =>
     client.query(api.finances.getPayments, input as never)),
-  createConvexToolEntry(getDefinition("addLineItem"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("addLineItem"), toolInput(getDefinition("addLineItem")), (client, input) =>
     client.mutation(api.finances.addLineItem, input as never)),
-  createConvexToolEntry(getDefinition("updateLineItem"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("updateLineItem"), toolInput(getDefinition("updateLineItem")), (client, input) =>
     client.mutation(api.finances.updateLineItem, input as never)),
-  createConvexToolEntry(getDefinition("createProposal"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("createProposal"), toolInput(getDefinition("createProposal")), (client, input) =>
     client.mutation(api.finances.createProposal, input as never)),
-  createConvexToolEntry(getDefinition("applyProposal"), z.object({ proposalId: uuid }), (client, input) =>
+  createConvexToolEntry(getDefinition("applyProposal"), z.object({ proposalId: uuid, itemIds: z.array(uuid).optional() }), (client, input) =>
     client.mutation(api.finances.applyProposal, input as never)),
   createConvexToolEntry(getDefinition("dismissProposal"), z.object({ proposalId: uuid }), (client, input) =>
     client.mutation(api.finances.dismissProposal, input as never)),
-  createConvexToolEntry(getDefinition("whatIfAnalysis"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("whatIfAnalysis"), toolInput(getDefinition("whatIfAnalysis")), (client, input) =>
     client.query(api.finances.whatIfAnalysis, input as never)),
   createConvexToolEntry(getDefinition("checkDrift"), z.object({ ledgerId: uuid }), (client, input) =>
     client.query(api.finances.checkDrift, input as never)),
-  createConvexToolEntry(getDefinition("checkMissingItems"), z.object({ ledgerId: uuid }), (client, input) =>
+  createConvexToolEntry(getDefinition("checkMissingItems"), toolInput(getDefinition("checkMissingItems")), (client, input) =>
     client.query(api.finances.checkMissingItems, input as never)),
   createConvexToolEntry(getDefinition("checkFundingReadiness"), z.object({ ledgerId: uuid }), (client, input) =>
     client.query(api.finances.checkFundingReadiness, input as never)),
-  createConvexToolEntry(getDefinition("preparePayment"), z.object({ ledgerId: uuid }).extend({ partyId: uuid.optional() }), (client, input) =>
+  createConvexToolEntry(getDefinition("preparePayment"), toolInput(getDefinition("preparePayment")), (client, input) =>
     client.query(api.finances.preparePayment, input as never)),
-  createConvexToolEntry(getDefinition("createPayment"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("createPayment"), toolInput(getDefinition("createPayment")), (client, input) =>
     client.mutation(api.finances.createPayment, input as never)),
-  createConvexToolEntry(getDefinition("voidPayment"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("voidPayment"), toolInput(getDefinition("voidPayment")), (client, input) =>
     client.mutation(api.finances.voidPayment, input as never)),
   createConvexToolEntry(getDefinition("getHistory"), z.object({
     rowId: z.string(),
@@ -120,35 +119,35 @@ const TOOL_ENTRIES: ToolEntry[] = [
   }), (client, input) => client.query(api.audit.getHistory, input as never)),
   createConvexToolEntry(getDefinition("listFindings"), z.object({ fileId: uuid }), (client, input) =>
     client.query(api.findings.listFindings, input as never)),
-  createConvexToolEntry(getDefinition("createFinding"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("createFinding"), toolInput(getDefinition("createFinding")), (client, input) =>
     client.mutation(api.findings.createFinding, input as never)),
-  createConvexToolEntry(getDefinition("addFindingSource"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("addFindingSource"), toolInput(getDefinition("addFindingSource")), (client, input) =>
     client.mutation(api.findings.addFindingSource, input as never)),
-  createConvexToolEntry(getDefinition("listSkills"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("listSkills"), toolInput(getDefinition("listSkills")), (client, input) =>
     client.query(api.skills.listSkills, input as never)),
   createConvexToolEntry(getDefinition("getSkill"), z.object({ skillId: uuid }), (client, input) =>
     client.query(api.skills.getSkill, input as never)),
-  createConvexToolEntry(getDefinition("createSkill"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("createSkill"), toolInput(getDefinition("createSkill")), (client, input) =>
     client.mutation(api.skills.createSkill, input as never)),
-  createConvexToolEntry(getDefinition("updateSkill"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("updateSkill"), toolInput(getDefinition("updateSkill")), (client, input) =>
     client.mutation(api.skills.updateSkill, input as never)),
   createConvexToolEntry(getDefinition("deleteSkill"), z.object({ skillId: uuid }), (client, input) =>
     client.mutation(api.skills.deleteSkill, input as never)),
-  createConvexToolEntry(getDefinition("listActionItems"), z.object({ fileId: uuid.optional() }).passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("listActionItems"), toolInput(getDefinition("listActionItems")), (client, input) =>
     client.query(api.actionItems.listItems, input as never)),
   createConvexToolEntry(getDefinition("getActionItem"), z.object({ id: uuid }), (client, input) =>
     client.query(api.actionItems.getItem, input as never)),
-  createConvexToolEntry(getDefinition("createActionItem"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("createActionItem"), toolInput(getDefinition("createActionItem")), (client, input) =>
     client.mutation(api.actionItems.createItem, input as never)),
   createConvexToolEntry(getDefinition("completeActionItem"), z.object({ id: uuid }), (client, input) =>
     client.mutation(api.actionItems.completeItem, input as never)),
   createConvexToolEntry(getDefinition("deleteActionItem"), z.object({ id: uuid }), (client, input) =>
     client.mutation(api.actionItems.deleteItem, input as never)),
-  createConvexToolEntry(getDefinition("reassignActionItem"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("reassignActionItem"), toolInput(getDefinition("reassignActionItem")), (client, input) =>
     client.mutation(api.actionItems.reassignItem, input as never)),
   createConvexToolEntry(getDefinition("uncompleteActionItem"), z.object({ id: uuid }), (client, input) =>
     client.mutation(api.actionItems.uncompleteItem, input as never)),
-  createConvexToolEntry(getDefinition("reconcileActionItemMap"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("reconcileActionItemMap"), toolInput(getDefinition("reconcileActionItemMap")), (client, input) =>
     client.mutation(api.actionItems.reconcileActionItemMap, input as never)),
 ];
 

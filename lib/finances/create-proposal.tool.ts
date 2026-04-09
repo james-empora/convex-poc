@@ -1,4 +1,5 @@
 import { defineTool } from "@/lib/tools/define-tool";
+import { CreateProposalInput } from "@/lib/finances/tool-inputs.input";
 
 export const createProposalTool = defineTool({
   actionName: "createProposal",
@@ -8,6 +9,7 @@ export const createProposalTool = defineTool({
     "Create a change proposal with one or more line item modifications for the closer to review. " +
     "Include a trigger description, the proposed changes, and the net impact on each party. " +
     "The closer can then apply or dismiss the proposal.",
+  inputSchema: CreateProposalInput,
   ui: {
     label: "Proposal",
     loadingLabel: "Preparing proposal...",
