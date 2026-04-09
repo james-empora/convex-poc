@@ -161,26 +161,70 @@ function decodeToolInput(schema: z.ZodTypeAny, rawInput: unknown) {
 }
 
 function zodObjectToMcpInputSchema(schema: z.ZodTypeAny) {
-  if (schema instanceof z.ZodObject) {
-    return schema.shape;
+  const providerSafeSchema = toProviderSafeObjectSchema(schema);
+  if (providerSafeSchema) {
+    return providerSafeSchema.shape;
   }
 
   return passthrough().shape;
 }
 
 function zodToAiInputSchema(schema: z.ZodTypeAny) {
-  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
-
-  if (typeof jsonSchema.type === "string") {
-    return jsonSchema as Parameters<typeof aiJsonSchema>[0];
+  const providerSafeSchema = toProviderSafeObjectSchema(schema);
+  if (providerSafeSchema) {
+    return z.toJSONSchema(providerSafeSchema) as Parameters<typeof aiJsonSchema>[0];
   }
 
-  // Anthropic tool schemas require a top-level object type even when the
-  // underlying schema is a union/discriminated union of object shapes.
-  return {
-    type: "object",
-    ...jsonSchema,
-  } as Parameters<typeof aiJsonSchema>[0];
+  return z.toJSONSchema(passthrough()) as Parameters<typeof aiJsonSchema>[0];
+}
+
+function toProviderSafeObjectSchema(schema: z.ZodTypeAny) {
+  if (schema instanceof z.ZodObject) {
+    return schema;
+  }
+
+  if (
+    (schema instanceof z.ZodUnion || schema instanceof z.ZodDiscriminatedUnion)
+    && schema.options.every((option) => option instanceof z.ZodObject)
+  ) {
+    return mergeObjectUnionSchema(schema.options as z.ZodObject<Record<string, z.ZodTypeAny>>[]);
+  }
+
+  return null;
+}
+
+function mergeObjectUnionSchema(options: z.ZodObject<Record<string, z.ZodTypeAny>>[]) {
+  const mergedShape: Record<string, z.ZodTypeAny> = {};
+
+  for (const option of options) {
+    for (const key of Object.keys(option.shape)) {
+      const fieldSchemas = options
+        .map((candidate) => candidate.shape[key])
+        .filter((candidate): candidate is z.ZodTypeAny => candidate !== undefined)
+        .map((candidate) => candidate.isOptional() ? candidate.nonoptional() : candidate);
+
+      const mergedField = mergeFieldSchemas(fieldSchemas);
+      const isRequiredInEveryOption = options.every((candidate) => {
+        const field = candidate.shape[key];
+        return field !== undefined && !field.isOptional();
+      });
+
+      mergedShape[key] = isRequiredInEveryOption ? mergedField : mergedField.optional();
+    }
+  }
+
+  return z.object(mergedShape);
+}
+
+function mergeFieldSchemas(fieldSchemas: [z.ZodTypeAny, ...z.ZodTypeAny[]] | z.ZodTypeAny[]) {
+  const uniqueSchemas = Array.from(new Set(fieldSchemas));
+
+  if (uniqueSchemas.length === 1) {
+    return uniqueSchemas[0];
+  }
+
+  const [first, second, ...rest] = uniqueSchemas;
+  return z.union([first, second, ...rest]);
 }
 
 function createToolClient(authInfo?: McpAuthInfo) {
