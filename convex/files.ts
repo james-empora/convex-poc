@@ -207,6 +207,7 @@ async function resolvePartyEntity(
   };
 
   return {
+    filePartyId: legacy(party),
     entityType: party.entity.type,
     entityId,
     name: name ?? "Unknown",

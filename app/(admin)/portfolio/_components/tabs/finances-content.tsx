@@ -126,11 +126,19 @@ export function FinancesContent({ fileId }: { fileId: string }) {
 
   // Extract file parties for the add form
   const fileParties: FilePartyOption[] = useMemo(() => {
-    const fileData = file as { parties?: { role: string; side: string | null; entities: { name: string; entityId: string }[] }[] } | null;
+    const fileData = file as {
+      parties?: {
+        role: string;
+        side: string | null;
+        entities: { name: string; entityId: string; filePartyId?: string }[];
+      }[];
+    } | null;
     if (!fileData?.parties) return [];
-    return fileData.parties.flatMap((group: { role: string; side: string | null; entities: { name: string; entityId: string }[] }) =>
-      group.entities.map((entity: { name: string; entityId: string }) => ({
-        id: entity.entityId,
+    return fileData.parties.flatMap((group) =>
+      group.entities
+        .filter((entity) => !!entity.filePartyId)
+        .map((entity) => ({
+        id: entity.filePartyId!,
         name: entity.name,
         role: group.role,
         side: (group.side ?? "internal") as LineItemCharge["partySide"],
@@ -287,6 +295,7 @@ export function FinancesContent({ fileId }: { fileId: string }) {
               <PaymentsPanel
                 payments={payments}
                 ledgerId={ledger.id}
+                parties={fileParties}
               />
             </section>
 

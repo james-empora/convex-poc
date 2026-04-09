@@ -12,27 +12,30 @@ import type { Payment } from "@/types/finance";
 
 function AddPaymentForm({
   ledgerId,
+  parties,
   paymentType,
   onClose,
   onAdded,
 }: {
   ledgerId?: string;
+  parties: Array<{ id: string; name: string; role: string }>;
   paymentType: "receipt" | "disbursement";
   onClose: () => void;
   onAdded: () => void;
 }) {
-  const [partyName, setPartyName] = useState("");
+  const [partyId, setPartyId] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"wire" | "check" | "ach" | "internal_transfer">("wire");
   const [memo, setMemo] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const createPayment = useCreatePayment(ledgerId ?? null);
+  const selectedParty = parties.find((party) => party.id === partyId) ?? null;
 
   async function handleSave() {
     const cents = Math.round(parseFloat(amount) * 100);
-    if (!partyName.trim() || isNaN(cents) || cents <= 0) {
-      setError("Enter a party name and valid amount.");
+    if (!selectedParty || isNaN(cents) || cents <= 0) {
+      setError("Select a party and enter a valid amount.");
       return;
     }
     if (!ledgerId) {
@@ -44,8 +47,8 @@ function AddPaymentForm({
     try {
       await createPayment.mutateAsync({
         ledgerId,
-        partyId: ledgerId, // TODO: replace with actual party picker
-        partyName,
+        partyId: selectedParty.id,
+        partyName: selectedParty.name,
         paymentType,
         method,
         amountCents: cents,
@@ -64,13 +67,19 @@ function AddPaymentForm({
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-0 flex-1">
           <label className="text-xs font-medium text-onyx-60">Party</label>
-          <input
-            value={partyName}
-            onChange={(e) => setPartyName(e.target.value)}
-            placeholder="John Smith"
+          <select
+            value={partyId}
+            onChange={(e) => setPartyId(e.target.value)}
             className="mt-1 w-full rounded-md border border-onyx-20 bg-white px-2.5 py-1.5 text-sm"
             autoFocus
-          />
+          >
+            <option value="">Select party...</option>
+            {parties.map((party) => (
+              <option key={party.id} value={party.id}>
+                {party.name} ({party.role.replace(/_/g, " ")})
+              </option>
+            ))}
+          </select>
         </div>
         <div className="w-28">
           <label className="text-xs font-medium text-onyx-60">Amount ($)</label>
@@ -123,11 +132,13 @@ function AddPaymentForm({
 export function PaymentsPanel({
   payments,
   ledgerId,
+  parties = [],
   onPaymentAdded,
   className,
 }: {
   payments: Payment[];
   ledgerId?: string;
+  parties?: Array<{ id: string; name: string; role: string }>;
   onPaymentAdded?: () => void;
   className?: string;
 }) {
@@ -186,6 +197,7 @@ export function PaymentsPanel({
       {addingPayment && (
         <AddPaymentForm
           ledgerId={ledgerId}
+          parties={parties}
           paymentType={view === "receipts" ? "receipt" : "disbursement"}
           onClose={() => setAddingPayment(false)}
           onAdded={() => {

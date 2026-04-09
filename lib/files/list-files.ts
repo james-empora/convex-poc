@@ -35,6 +35,7 @@ export type FileSummary = {
     role: string;
     side: string | null;
     entities: Array<{
+      filePartyId?: string;
       entityType: string;
       entityId: string;
       name: string;
