@@ -6,6 +6,27 @@ import { api } from "@/convex/_generated/api";
 import { toAppUser } from "@/lib/auth/permissions";
 import type { AuthProvider } from "./types";
 
+function buildLoginRedirect(request: Parameters<AuthProvider["handleProxy"]>[0]) {
+  const loginUrl = new URL("/auth/login", request.url);
+  loginUrl.searchParams.set(
+    "returnTo",
+    request.nextUrl.pathname + request.nextUrl.search,
+  );
+  return NextResponse.redirect(loginUrl);
+}
+
+function isConvexAuthFailure(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes('"code":"Unauthenticated"')
+    || error.message.includes("Could not verify OIDC token claim")
+    || error.message.includes("token hasn't expired")
+  );
+}
+
 export function createReal(): AuthProvider {
   return {
     async handleProxy(request, { isPublic }) {
@@ -17,12 +38,7 @@ export function createReal(): AuthProvider {
 
       const session = await auth0.getSession(request);
       if (!session) {
-        const loginUrl = new URL("/auth/login", request.url);
-        loginUrl.searchParams.set(
-          "returnTo",
-          request.nextUrl.pathname + request.nextUrl.search,
-        );
-        return NextResponse.redirect(loginUrl);
+        return buildLoginRedirect(request);
       }
 
       const { sub, email } = session.user;
@@ -43,6 +59,10 @@ export function createReal(): AuthProvider {
         response.headers.set("x-user-type", user.userType);
         response.headers.set("x-user-permissions", user.permissions.join(","));
       } catch (err) {
+        if (isConvexAuthFailure(err)) {
+          return buildLoginRedirect(request);
+        }
+
         console.error("[proxy] Failed to resolve user via Convex:", err);
       }
 

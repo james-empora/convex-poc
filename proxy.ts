@@ -18,6 +18,27 @@ function isPublic(pathname: string) {
   return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
+function buildLoginRedirect(request: NextRequest) {
+  const loginUrl = new URL("/auth/login", request.url);
+  loginUrl.searchParams.set(
+    "returnTo",
+    request.nextUrl.pathname + request.nextUrl.search,
+  );
+  return NextResponse.redirect(loginUrl);
+}
+
+function isConvexAuthFailure(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes('"code":"Unauthenticated"')
+    || error.message.includes("Could not verify OIDC token claim")
+    || error.message.includes("token hasn't expired")
+  );
+}
+
 export async function proxy(request: NextRequest) {
   const response = await auth0.middleware(request);
 
@@ -27,12 +48,7 @@ export async function proxy(request: NextRequest) {
 
   const session = await auth0.getSession(request);
   if (!session) {
-    const loginUrl = new URL("/auth/login", request.url);
-    loginUrl.searchParams.set(
-      "returnTo",
-      request.nextUrl.pathname + request.nextUrl.search,
-    );
-    return NextResponse.redirect(loginUrl);
+    return buildLoginRedirect(request);
   }
 
   // Resolve Auth0 session to local user record (creates on first login)
@@ -66,6 +82,10 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/portal", request.url));
     }
   } catch (err) {
+    if (isConvexAuthFailure(err)) {
+      return buildLoginRedirect(request);
+    }
+
     console.error("[proxy] Failed to resolve user via Convex:", err);
     // Let the request through without user headers so the app still loads
   }
