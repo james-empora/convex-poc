@@ -29,6 +29,57 @@ const uuid = z.string().uuid();
 const passthrough = () => z.object({}).passthrough();
 const optionalUuid = uuid.optional();
 
+const openFileInput = z.object({
+  fileType: z.enum(["purchase", "refinance", "wholesale"]),
+  addressLine1: z.string(),
+  addressLine2: z.string().optional(),
+  city: z.string(),
+  state: z.string(),
+  zip: z.string(),
+  county: z.string().optional(),
+  parcelNumber: z.string().optional(),
+  legalDescription: z.string().optional(),
+  propertyType: z.enum([
+    "single_family",
+    "condo",
+    "multi_family",
+    "commercial",
+    "land",
+    "manufactured",
+  ]).optional(),
+  documentId: z.string().optional(),
+  purchasePriceCents: z.number().optional(),
+  earnestMoneyCents: z.number().optional(),
+  contractDate: z.string().optional(),
+  closingDate: z.string().optional(),
+  financingType: z.enum([
+    "conventional",
+    "fha",
+    "va",
+    "usda",
+    "cash",
+    "other",
+  ]).optional(),
+  loanAmountCents: z.number().optional(),
+  isCashOut: z.boolean().optional(),
+}).superRefine((value, ctx) => {
+  if (value.fileType === "purchase" && value.purchasePriceCents === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "purchasePriceCents is required when fileType is purchase",
+      path: ["purchasePriceCents"],
+    });
+  }
+
+  if (value.fileType === "refinance" && value.loanAmountCents === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "loanAmountCents is required when fileType is refinance",
+      path: ["loanAmountCents"],
+    });
+  }
+});
+
 const TOOL_DEFINITION_BY_NAME = new Map(
   listToolDefinitions().map((definition) => [definition.toolName, definition]),
 );
@@ -68,7 +119,7 @@ const TOOL_ENTRIES: ToolEntry[] = [
     client.query(api.documents.getExtractedText, input as never)),
   createConvexToolEntry(getDefinition("listFileDocuments"), z.object({ fileId: uuid }), (client, input) =>
     client.query(api.documents.listFileDocuments, input as never)),
-  createConvexToolEntry(getDefinition("openFile"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("openFile"), openFileInput, (client, input) =>
     client.mutation(api.files.openFile, input as never)),
   createConvexToolEntry(getDefinition("listFiles"), passthrough(), (client, input) =>
     client.query(api.files.listFiles, input as never)),
@@ -187,9 +238,32 @@ function createAiTool(entry: ToolEntry, context: ToolExecutionContext): ReturnTy
     inputSchema: aiJsonSchema(z.toJSONSchema(entry.input) as Parameters<typeof aiJsonSchema>[0]),
     execute: async (rawInput: unknown) => {
       const decoded = decodeToolInput(entry.input, rawInput);
-      return await entry.execute(decoded, context);
+
+      try {
+        return await entry.execute(decoded, context);
+      } catch (error) {
+        console.error("[tools][ai-execute-error]", {
+          toolName: entry.definition.gatewayName,
+          input: decoded,
+          error: serializeUnknownError(error),
+        });
+        throw error;
+      }
     },
   }) as ReturnType<typeof defineAiTool>;
+}
+
+function serializeUnknownError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause,
+    };
+  }
+
+  return error;
 }
 
 export function buildChatTools(_user: AppUser | null, convex = createConvexHttpClient()) {

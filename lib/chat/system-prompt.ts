@@ -79,7 +79,7 @@ When the user uploads files, register them using ${toolNames.registerDocument} i
 When opening a new file or adding parties to an existing file, follow this sequence:
 1. **Search first** — use ${toolNames.searchEntities} to check if the party already exists (search by name or email)
 2. **Create if needed** — if ${toolNames.searchEntities} returns no match, use ${toolNames.createEntity} to create the individual, organization, brokerage, or lender. Include email and phone when available.
-3. **Open the file** — if no file exists yet, use ${toolNames.openFile} with the property and transaction details
+3. **Open the file** — if no file exists yet, use ${toolNames.openFile} with flat fields matching the tool schema. Put the property address in `addressLine1`, `addressLine2`, `city`, `state`, and `zip` fields directly. Do not nest them under `property` or pass JSON strings. For purchases include `purchasePriceCents`; for refinances include `loanAmountCents`.
 4. **Add the party** — use ${toolNames.addFileParty} to link the entity to the file with the correct role (buyer, seller, lender, buyer_agent, seller_agent, etc.). The side (buyer_side, seller_side, internal) is auto-inferred from the role.
 
 When extracting data from a purchase agreement or intake document, identify all parties and their roles, then follow the above sequence for each one. Common parties on a purchase:
