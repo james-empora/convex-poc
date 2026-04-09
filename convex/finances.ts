@@ -306,7 +306,7 @@ export const getLedger = query({
   handler: async (ctx, args) => {
     const file = await findFileByLegacyId(ctx, args.fileId);
     if (!file) {
-      throw new ConvexError({ code: "NotFound", message: `No primary ledger found for file: ${args.fileId}` });
+      throw new ConvexError({ code: "NotFound", message: `File not found: ${args.fileId}` });
     }
 
     const ledgers = await ctx.db
@@ -315,7 +315,7 @@ export const getLedger = query({
       .collect();
     const ledger = ledgers.find((candidate) => candidate.isPrimary);
     if (!ledger) {
-      throw new ConvexError({ code: "NotFound", message: `No primary ledger found for file: ${args.fileId}` });
+      return null;
     }
 
     return await computeLedgerSummary(ctx, file, ledger);
