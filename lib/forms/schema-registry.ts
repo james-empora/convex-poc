@@ -4,6 +4,7 @@ import { CreateEntityInput } from "@/lib/entities/create-entity.input";
 import { SearchEntitiesInput } from "@/lib/entities/search-entities.input";
 import { AddFilePartyInput } from "@/lib/files/add-file-party.input";
 import { GetFileInput } from "@/lib/files/get-file.input";
+import { OpenFileInput } from "@/lib/files/open-file.input";
 import { RegisterClientUploadInput } from "@/lib/documents/register-client-upload.input";
 import { UpdateChatTitleInput } from "@/lib/chat/update-chat-title.input";
 
@@ -33,6 +34,11 @@ export const SCHEMA_REGISTRY: SchemaRegistryEntry[] = [
     name: "Get File",
     description: "Retrieve a file by ID",
     schema: GetFileInput,
+  },
+  {
+    name: "Open File",
+    description: "Open a new title or escrow file",
+    schema: OpenFileInput,
   },
   {
     name: "Register Document Upload",

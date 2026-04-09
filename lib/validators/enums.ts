@@ -32,6 +32,16 @@ export const FILE_PARTY_ROLES = [
   "settlement_agent",
 ] as const;
 export const FILE_PARTY_SIDES = ["buyer_side", "seller_side", "internal"] as const;
+export const FILE_TYPES = ["purchase", "refinance", "wholesale"] as const;
+export const PROPERTY_TYPES = [
+  "single_family",
+  "condo",
+  "multi_family",
+  "commercial",
+  "land",
+  "manufactured",
+] as const;
+export const FINANCING_TYPES = ["conventional", "fha", "va", "usda", "cash", "other"] as const;
 export const DOCUMENT_TYPES = [
   "purchase_contract",
   "deed",
@@ -82,6 +92,9 @@ export const FormationTypeSchema = z.enum(FORMATION_TYPES);
 export const LenderTypeSchema = z.enum(LENDER_TYPES);
 export const FilePartyRoleSchema = z.enum(FILE_PARTY_ROLES);
 export const FilePartySideSchema = z.enum(FILE_PARTY_SIDES);
+export const FileTypeSchema = z.enum(FILE_TYPES);
+export const PropertyTypeSchema = z.enum(PROPERTY_TYPES);
+export const FinancingTypeSchema = z.enum(FINANCING_TYPES);
 export const DocumentTypeSchema = z.enum(DOCUMENT_TYPES);
 export const DocumentFiletypeSchema = z.enum(DOCUMENT_FILETYPES);
 export const DocumentOriginSchema = z.enum(DOCUMENT_ORIGINS);

@@ -21,64 +21,13 @@ type ToolExecutionContext = {
 
 type ToolEntry = {
   definition: ToolDefinition;
-  input: z.ZodObject<Record<string, z.ZodTypeAny>>;
+  input: z.ZodTypeAny;
   execute: (input: unknown, context: ToolExecutionContext) => Promise<unknown>;
 };
 
 const uuid = z.string().uuid();
 const passthrough = () => z.object({}).passthrough();
 const optionalUuid = uuid.optional();
-
-const openFileInput = z.object({
-  fileType: z.enum(["purchase", "refinance", "wholesale"]),
-  addressLine1: z.string(),
-  addressLine2: z.string().optional(),
-  city: z.string(),
-  state: z.string(),
-  zip: z.string(),
-  county: z.string().optional(),
-  parcelNumber: z.string().optional(),
-  legalDescription: z.string().optional(),
-  propertyType: z.enum([
-    "single_family",
-    "condo",
-    "multi_family",
-    "commercial",
-    "land",
-    "manufactured",
-  ]).optional(),
-  documentId: z.string().optional(),
-  purchasePriceCents: z.number().optional(),
-  earnestMoneyCents: z.number().optional(),
-  contractDate: z.string().optional(),
-  closingDate: z.string().optional(),
-  financingType: z.enum([
-    "conventional",
-    "fha",
-    "va",
-    "usda",
-    "cash",
-    "other",
-  ]).optional(),
-  loanAmountCents: z.number().optional(),
-  isCashOut: z.boolean().optional(),
-}).superRefine((value, ctx) => {
-  if (value.fileType === "purchase" && value.purchasePriceCents === undefined) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "purchasePriceCents is required when fileType is purchase",
-      path: ["purchasePriceCents"],
-    });
-  }
-
-  if (value.fileType === "refinance" && value.loanAmountCents === undefined) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "loanAmountCents is required when fileType is refinance",
-      path: ["loanAmountCents"],
-    });
-  }
-});
 
 const TOOL_DEFINITION_BY_NAME = new Map(
   listToolDefinitions().map((definition) => [definition.toolName, definition]),
@@ -94,7 +43,7 @@ function getDefinition(toolName: string) {
 
 function createConvexToolEntry(
   definition: ToolDefinition,
-  input: z.ZodObject<Record<string, z.ZodTypeAny>>,
+  input: z.ZodTypeAny,
   execute: (client: ConvexHttpClient, input: unknown) => Promise<unknown>,
 ): ToolEntry {
   return {
@@ -104,39 +53,32 @@ function createConvexToolEntry(
   };
 }
 
+function toolInput(definition: ToolDefinition, fallback: z.ZodTypeAny = passthrough()) {
+  return definition.inputSchema ?? fallback;
+}
+
 const TOOL_ENTRIES: ToolEntry[] = [
-  createConvexToolEntry(getDefinition("registerDocument"), z.object({
-    name: z.string(),
-    documentType: z.string(),
-    filetype: z.string(),
-    storagePath: z.string(),
-    fileSizeBytes: z.number(),
-    origin: z.string().optional(),
-    resourceType: z.string().optional(),
-    resourceId: z.string().optional(),
-  }), (client, input) => client.mutation(api.documents.registerClientUpload, input as never)),
+  createConvexToolEntry(getDefinition("registerDocument"), toolInput(getDefinition("registerDocument")), (client, input) =>
+    client.mutation(api.documents.registerClientUpload, input as never)),
   createConvexToolEntry(getDefinition("getExtractedText"), z.object({ documentId: uuid }), (client, input) =>
     client.query(api.documents.getExtractedText, input as never)),
   createConvexToolEntry(getDefinition("listFileDocuments"), z.object({ fileId: uuid }), (client, input) =>
     client.query(api.documents.listFileDocuments, input as never)),
-  createConvexToolEntry(getDefinition("openFile"), openFileInput, (client, input) =>
+  createConvexToolEntry(getDefinition("openFile"), toolInput(getDefinition("openFile")), (client, input) =>
     client.mutation(api.files.openFile, input as never)),
   createConvexToolEntry(getDefinition("listFiles"), passthrough(), (client, input) =>
     client.query(api.files.listFiles, input as never)),
-  createConvexToolEntry(getDefinition("getFile"), z.object({ fileId: uuid }), (client, input) =>
+  createConvexToolEntry(getDefinition("getFile"), toolInput(getDefinition("getFile"), z.object({ fileId: uuid })), (client, input) =>
     client.query(api.files.getFile, input as never)),
-  createConvexToolEntry(getDefinition("addFileParty"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("addFileParty"), toolInput(getDefinition("addFileParty")), (client, input) =>
     client.mutation(api.files.addFileParty, input as never)),
   createConvexToolEntry(getDefinition("removeFileParty"), passthrough(), (client, input) =>
     client.mutation(api.files.removeFileParty, input as never)),
   createConvexToolEntry(getDefinition("readEntities"), passthrough(), (client, input) =>
     client.query(api.entities.readEntities, input as never)),
-  createConvexToolEntry(getDefinition("searchEntities"), z.object({
-    query: z.string(),
-    entityType: z.string().optional(),
-    limit: z.number().optional(),
-  }), (client, input) => client.query(api.entities.searchEntities, input as never)),
-  createConvexToolEntry(getDefinition("createEntity"), passthrough(), (client, input) =>
+  createConvexToolEntry(getDefinition("searchEntities"), toolInput(getDefinition("searchEntities")), (client, input) =>
+    client.query(api.entities.searchEntities, input as never)),
+  createConvexToolEntry(getDefinition("createEntity"), toolInput(getDefinition("createEntity")), (client, input) =>
     client.mutation(api.entities.createEntity, input as never)),
   createConvexToolEntry(getDefinition("generateStatement"), z.object({ fileId: uuid }), (client, input) =>
     client.mutation(api.finances.generateStatement, input as never)),
@@ -210,7 +152,7 @@ const TOOL_ENTRIES: ToolEntry[] = [
     client.mutation(api.actionItems.reconcileActionItemMap, input as never)),
 ];
 
-function decodeToolInput(schema: z.ZodObject<Record<string, z.ZodTypeAny>>, rawInput: unknown) {
+function decodeToolInput(schema: z.ZodTypeAny, rawInput: unknown) {
   const decoded = schema.safeParse(rawInput);
   if (!decoded.success) {
     throw new Error(decoded.error.issues.map((issue) => issue.message).join(", "));
@@ -218,8 +160,12 @@ function decodeToolInput(schema: z.ZodObject<Record<string, z.ZodTypeAny>>, rawI
   return decoded.data;
 }
 
-function zodObjectToMcpInputSchema(schema: z.ZodObject<Record<string, z.ZodTypeAny>>) {
-  return schema.shape;
+function zodObjectToMcpInputSchema(schema: z.ZodTypeAny) {
+  if (schema instanceof z.ZodObject) {
+    return schema.shape;
+  }
+
+  return passthrough().shape;
 }
 
 function createToolClient(authInfo?: McpAuthInfo) {

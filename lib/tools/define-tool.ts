@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 export type ToolIconName =
   | "upload" | "file-text" | "folder-open" | "search" | "user-plus" | "user-minus"
   | "bar-chart" | "list" | "plus-circle" | "pencil" | "sparkles"
@@ -31,6 +33,7 @@ export type ToolDefinition = {
   group: ToolGroupId;
   legacyToolNames?: string[];
   gatewayDescription?: string;
+  inputSchema?: z.ZodTypeAny;
   ui?: ToolUiMeta;
 };
 

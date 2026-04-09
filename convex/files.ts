@@ -248,14 +248,6 @@ function normalizeAddress(doc: Doc<"addresses">) {
   return `${doc.addressLine1}${doc.addressLine2 ? ` ${doc.addressLine2}` : ""}, ${doc.city}, ${doc.state} ${doc.zip}`;
 }
 
-function compactRecord<T extends Record<string, unknown>>(value: T): T | undefined {
-  const filtered = Object.fromEntries(
-    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
-  ) as T;
-
-  return Object.keys(filtered).length > 0 ? filtered : undefined;
-}
-
 export const getFile = query({
   args: { fileId: v.string() },
   returns: v.any(),
@@ -474,19 +466,19 @@ export const openFile = mutation({
 
       let metadata: Record<string, unknown> | undefined;
       if (args.fileType === "purchase") {
-        metadata = compactRecord({
+        metadata = {
           purchase_price_cents: args.purchasePriceCents,
           earnest_money_cents: args.earnestMoneyCents,
           contract_date: args.contractDate,
           closing_date: args.closingDate,
           financing_type: args.financingType,
-        });
+        };
       } else if (args.fileType === "refinance") {
-        metadata = compactRecord({
+        metadata = {
           loan_amount_cents: args.loanAmountCents,
           is_cash_out: args.isCashOut,
           closing_date: args.closingDate,
-        });
+        };
       }
 
       const file = await auditedInsert(
