@@ -13,6 +13,7 @@
     "convex:dev": "pnpm convex:local",
     "convex:once": "CONVEX_AGENT_MODE=anonymous convex dev --once --typecheck disable",
     "convex:dashboard": "convex dashboard",
+    "seed:skills": "npx convex run skills:ensureDefaultSkills",
     "test": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed"

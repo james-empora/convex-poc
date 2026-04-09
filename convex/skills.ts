@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { DEFAULT_SKILLS } from "../lib/skills/default-skills";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { auditedDelete, auditedInsert, auditedPatch } from "./lib/audit";
 
@@ -92,8 +93,27 @@ async function findSkillByLegacyId(
 ) {
   return await ctx.db
     .query("skills")
-    .withIndex("by_legacy_id", (q: any) => q.eq("legacyId", legacyId))
+    .withIndex("by_legacy_id", (q) => q.eq("legacyId", legacyId))
     .unique();
+}
+
+async function findSkillBySlug(
+  ctx: QueryCtx | MutationCtx,
+  slug: string,
+) {
+  const matches = await ctx.db
+    .query("skills")
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
+    .collect();
+
+  return matches.find((skill) => !skill.deletedAt) ?? matches[0] ?? null;
+}
+
+function samePlacement(
+  left: { domain: string; subDomain?: string },
+  right: { domain: string; subDomain?: string },
+) {
+  return left.domain === right.domain && (left.subDomain ?? undefined) === (right.subDomain ?? undefined);
 }
 
 export const listSkills = query({
@@ -216,6 +236,99 @@ export const createSkill = mutation({
 
       return normalizeSkill(skill, placements);
     },
+});
+
+export const ensureDefaultSkills = mutation({
+  args: {},
+  returns: v.object({
+    created: v.number(),
+    restored: v.number(),
+    placementsCreated: v.number(),
+    skills: v.array(v.object({
+      slug: v.string(),
+      skillId: v.string(),
+      created: v.boolean(),
+      restored: v.boolean(),
+    })),
+  }),
+  handler: async (ctx) => {
+    let created = 0;
+    let restored = 0;
+    let placementsCreated = 0;
+    const skills = [];
+
+    for (const seed of DEFAULT_SKILLS) {
+      const now = Date.now();
+      const existing = await findSkillBySlug(ctx, seed.slug);
+      let skill = existing;
+      let createdSkill = false;
+      let restoredSkill = false;
+
+      if (!existing) {
+        created += 1;
+        createdSkill = true;
+        skill = await auditedInsert(ctx, "skills", {
+          legacyId: crypto.randomUUID(),
+          slug: seed.slug,
+          label: seed.label,
+          description: seed.description,
+          promptTemplate: seed.promptTemplate,
+          autoSend: seed.autoSend,
+          enabled: seed.enabled,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: undefined,
+        });
+      } else if (existing.deletedAt) {
+        restored += 1;
+        restoredSkill = true;
+        skill = await auditedPatch(ctx, "skills", existing._id, {
+          slug: seed.slug,
+          label: seed.label,
+          description: seed.description,
+          promptTemplate: seed.promptTemplate,
+          autoSend: seed.autoSend,
+          enabled: seed.enabled,
+          updatedAt: now,
+          deletedAt: undefined,
+        });
+      }
+
+      if (!skill) continue;
+
+      const existingPlacements = (await placementsBySkillIds(ctx, [skill._id])).get(skill._id) ?? [];
+
+      for (const placement of seed.placements) {
+        const alreadyExists = existingPlacements.some((existingPlacement) =>
+          samePlacement(existingPlacement, placement));
+        if (alreadyExists) continue;
+
+        placementsCreated += 1;
+        await auditedInsert(ctx, "skill_placements", {
+          legacyId: crypto.randomUUID(),
+          skillId: skill._id,
+          domain: placement.domain,
+          subDomain: placement.subDomain,
+          sortOrder: placement.sortOrder,
+          createdAt: now,
+        });
+      }
+
+      skills.push({
+        slug: seed.slug,
+        skillId: skillId(skill),
+        created: createdSkill,
+        restored: restoredSkill,
+      });
+    }
+
+    return {
+      created,
+      restored,
+      placementsCreated,
+      skills,
+    };
+  },
 });
 
 export const updateSkill = mutation({
