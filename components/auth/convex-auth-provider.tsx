@@ -5,8 +5,7 @@ import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithAuth } from "convex/react";
 import { env } from "@/env";
 
-const convexUrl = env.NEXT_PUBLIC_CONVEX_URL;
-const convexClient = convexUrl ? new ConvexReactClient(convexUrl) : null;
+const convexClient = new ConvexReactClient(env.NEXT_PUBLIC_CONVEX_URL);
 
 function useAuth0ForConvex() {
   const { user, isLoading } = useUser();
@@ -32,10 +31,6 @@ function useAuth0ForConvex() {
 }
 
 export function ConvexAuthProvider({ children }: { children: React.ReactNode }) {
-  if (!convexClient) {
-    return children;
-  }
-
   return (
     <ConvexProviderWithAuth client={convexClient} useAuth={useAuth0ForConvex}>
       {children}

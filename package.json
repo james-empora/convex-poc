@@ -5,7 +5,8 @@
   "packageManager": "pnpm@10.32.1",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npx convex deploy --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'pnpm build:local'",
+    "build:local": "next build",
     "start": "next start",
     "lint": "eslint",
     "convex:local": "CONVEX_AGENT_MODE=anonymous convex dev --typecheck disable",

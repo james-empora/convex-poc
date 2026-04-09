@@ -50,8 +50,7 @@ export const env = createEnv({
     ATTOM_API_KEY: z.string().min(1).optional(),
   },
   client: {
-    NEXT_PUBLIC_CONVEX_URL: z.string().url().optional(),
-    NEXT_PUBLIC_CONVEX_SITE_URL: z.string().url().optional(),
+    NEXT_PUBLIC_CONVEX_URL: z.string().url(),
   },
   runtimeEnv: {
     AUTH0_DOMAIN: process.env.AUTH0_DOMAIN,
@@ -61,7 +60,6 @@ export const env = createEnv({
     AUTH0_AUDIENCE: process.env.AUTH0_AUDIENCE,
     APP_BASE_URL: process.env.APP_BASE_URL,
     NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL,
-    NEXT_PUBLIC_CONVEX_SITE_URL: process.env.NEXT_PUBLIC_CONVEX_SITE_URL,
     BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
     BLOB_STORE_NAME: process.env.BLOB_STORE_NAME,
     SMARTY_STRATEGY: process.env.SMARTY_STRATEGY,
