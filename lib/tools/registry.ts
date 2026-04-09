@@ -168,6 +168,21 @@ function zodObjectToMcpInputSchema(schema: z.ZodTypeAny) {
   return passthrough().shape;
 }
 
+function zodToAiInputSchema(schema: z.ZodTypeAny) {
+  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
+
+  if (typeof jsonSchema.type === "string") {
+    return jsonSchema as Parameters<typeof aiJsonSchema>[0];
+  }
+
+  // Anthropic tool schemas require a top-level object type even when the
+  // underlying schema is a union/discriminated union of object shapes.
+  return {
+    type: "object",
+    ...jsonSchema,
+  } as Parameters<typeof aiJsonSchema>[0];
+}
+
 function createToolClient(authInfo?: McpAuthInfo) {
   const client = createConvexHttpClient();
   if (authInfo?.clientId === "auth0" && authInfo.token) {
@@ -181,7 +196,7 @@ function createAiTool(entry: ToolEntry, context: ToolExecutionContext): ReturnTy
 
   return makeAiTool({
     description: entry.definition.gatewayDescription,
-    inputSchema: aiJsonSchema(z.toJSONSchema(entry.input) as Parameters<typeof aiJsonSchema>[0]),
+    inputSchema: aiJsonSchema(zodToAiInputSchema(entry.input)),
     execute: async (rawInput: unknown) => {
       const decoded = decodeToolInput(entry.input, rawInput);
 
