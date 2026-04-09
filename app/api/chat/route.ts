@@ -76,7 +76,7 @@ export async function POST(req: Request) {
     tools: useGateway ? buildChatTools(user, convex) : undefined,
     stopWhen: stepCountIs(8),
     includeRawChunks: enableLocalDiagnostics,
-    onChunk: enableLocalDiagnostics
+    onChunk: process.env.NODE_ENV !== 'test'
       ? async ({ chunk }) => {
           const diagnosticChunk = chunk as {
             type: string;
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
           };
 
           if (diagnosticChunk.type === 'tool-error') {
-            console.error('[chat/local][tool-error]', {
+            console.error('[api/chat][tool-error]', {
               toolName: diagnosticChunk.toolName,
               toolCallId: diagnosticChunk.toolCallId,
               error: serializeUnknownError(diagnosticChunk.error),
@@ -100,14 +100,14 @@ export async function POST(req: Request) {
             });
           }
 
-          if (diagnosticChunk.type === 'raw') {
+          if (enableLocalDiagnostics && diagnosticChunk.type === 'raw') {
             console.error('[chat/local][raw-chunk]', diagnosticChunk.rawValue);
           }
         }
       : undefined,
-    onError: enableLocalDiagnostics
+    onError: process.env.NODE_ENV !== 'test'
       ? async ({ error }) => {
-          console.error('[chat/local][stream-error]', serializeUnknownError(error));
+          console.error('[api/chat][stream-error]', serializeUnknownError(error));
         }
       : undefined,
   });
